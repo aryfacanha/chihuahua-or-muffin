@@ -1,1 +1,11 @@
 kaggle
+torch
+torchvision
+pillow
+numpy
+opencv-python
+matplotlib
+seaborn
+scikit-learn
+streamlit
+pandas
