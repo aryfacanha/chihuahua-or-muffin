@@ -28,6 +28,11 @@ def parse_args():
 
 def load_image(image_path):
     image = Image.open(image_path).convert("RGB")
+
+    return prepare_image(image)
+
+
+def prepare_image(image):
     transform = create_transform()
     image_tensor = transform(image).unsqueeze(0)
 
@@ -53,6 +58,12 @@ def predict(model, image_tensor, device):
         confidence, predicted_index = probabilities.max(dim=1)
 
     return predicted_index.item(), confidence.item(), probabilities[0].cpu()
+
+
+def predict_image(model, image, device):
+    image_tensor = prepare_image(image)
+
+    return predict(model, image_tensor, device)
 
 
 def print_prediction(image_path, predicted_index, confidence, probabilities):
