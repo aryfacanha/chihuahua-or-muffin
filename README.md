@@ -47,4 +47,15 @@ O projeto utilizará transfer learning com um modelo pré-treinado, adaptando su
 
 ## Status
 
-Projeto em fase inicial.
+Etapas concluídas:
+
+- Preparação do dataset em `train`, `val` e `test`.
+- Carregamento do dataset com PyTorch.
+- Modelo com transfer learning usando MobileNetV2.
+- Loop de treino com validação e salvamento do melhor modelo.
+
+Próximas etapas:
+
+- Avaliação final no conjunto de teste.
+- Predição em imagens novas.
+- Interface simples para uso do modelo.
