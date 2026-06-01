@@ -1,23 +1,23 @@
-from pathlib import Path
-
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
-
-BATCH_SIZE = 32
-NUM_WORKERS = 0
+from config import (
+    BATCH_SIZE,
+    IMAGE_SIZE,
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    NUM_WORKERS,
+    PROCESSED_DATA_DIR,
+)
 
 
 def create_transform():
     return transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize(IMAGE_SIZE),
         transforms.ToTensor(),
         transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225],
+            mean=IMAGENET_MEAN,
+            std=IMAGENET_STD,
         ),
     ])
 

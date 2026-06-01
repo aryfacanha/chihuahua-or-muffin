@@ -1,16 +1,14 @@
-from pathlib import Path
 import random
 import shutil
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw" / "kaggle"
-PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
-
-CLASSES = ["chihuahua", "muffin"]
-SPLITS = ["train", "val", "test"]
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
-SEED = 42
+from config import (
+    CLASSES,
+    IMAGE_EXTENSIONS,
+    PROCESSED_DATA_DIR,
+    RAW_DATA_DIR,
+    SEED,
+    SPLITS,
+)
 
 
 def is_image(path):

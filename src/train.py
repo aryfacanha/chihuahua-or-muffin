@@ -1,17 +1,9 @@
-from pathlib import Path
-
 import torch
 from torch import nn, optim
 
+from config import EPOCHS, LEARNING_RATE, MODEL_PATH
 from dataset import create_dataloaders, create_datasets, create_transform
 from model import create_model
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-MODEL_PATH = PROJECT_ROOT / "models" / "best_model.pth"
-
-EPOCHS = 5
-LEARNING_RATE = 0.001
 
 
 def train_one_epoch(model, train_loader, criterion, optimizer, device):
