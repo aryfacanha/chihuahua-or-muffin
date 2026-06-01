@@ -5,16 +5,17 @@
 O projeto "Chihuahua or Muffin" é uma classificação binária de imagens.
 
 Classes:
+
 - `chihuahua`
 - `muffin`
 
-Nesta etapa, o projeto já prepara o dataset, carrega os dados, cria o modelo e executa um treino inicial. Ainda não há avaliação final no teste nem interface.
+A solução cobre o fluxo completo: preparação do dataset, carregamento com PyTorch, criação do modelo, treinamento, avaliação, predição individual e interface Streamlit.
 
 ## Preparação do dataset
 
 O arquivo `src/prepare_dataset.py` lê as imagens brutas em `data/raw/kaggle/`.
 
-Ele procura as classes `chihuahua` e `muffin`, embaralha as imagens com seed fixa e divide os dados em:
+Ele procura recursivamente as classes `chihuahua` e `muffin`, embaralha as imagens com seed fixa e divide os dados em:
 
 ```text
 70% train
@@ -22,7 +23,7 @@ Ele procura as classes `chihuahua` e `muffin`, embaralha as imagens com seed fix
 15% test
 ```
 
-As imagens são copiadas para `data/processed/`, ficando organizadas assim:
+As imagens são copiadas para `data/processed/`, mantendo a estrutura esperada pelo PyTorch:
 
 ```text
 data/processed/train/chihuahua
@@ -33,57 +34,99 @@ data/processed/test/chihuahua
 data/processed/test/muffin
 ```
 
-Ao final, o script mostra a quantidade de imagens por split e por classe.
-
 ## Carregamento com PyTorch
 
-O arquivo `src/dataset.py` usa `torchvision.datasets.ImageFolder` para carregar:
+O arquivo `src/dataset.py` usa `torchvision.datasets.ImageFolder` para carregar os três splits.
 
-```text
-data/processed/train
-data/processed/val
-data/processed/test
-```
+As imagens passam pelas seguintes transformações:
 
-As imagens passam por transforms simples: resize para `224x224`, conversão para tensor e normalização no padrão ImageNet.
+- redimensionamento para `224x224`;
+- conversão para tensor;
+- normalização com média e desvio padrão do ImageNet.
 
-Depois, são criados `DataLoaders` para `train`, `val` e `test`, usando `batch_size = 32`.
+Os `DataLoaders` usam `batch_size = 32`. O conjunto de treino é embaralhado; validação e teste não são.
 
-O resultado esperado inclui as classes detectadas, o `class_to_idx`, as quantidades por split e os shapes dos batches.
+## Modelo
 
-Exemplo de shape das imagens:
+O arquivo `src/model.py` cria uma MobileNetV2 com transfer learning.
 
-```text
-torch.Size([32, 3, 224, 224])
-```
+A estratégia é:
 
-Isso significa 32 imagens RGB com tamanho 224x224.
+- carregar a arquitetura MobileNetV2;
+- usar pesos pré-treinados do ImageNet durante criação para treino/teste estrutural;
+- congelar as camadas de extração de características;
+- substituir a camada final por uma camada linear com duas saídas.
 
-## Modelo e treino
+Na avaliação e na inferência, a arquitetura é criada sem baixar pesos pré-treinados e recebe os pesos locais de `models/best_model.pth`.
 
-O arquivo `src/model.py` cria uma MobileNetV2 pré-treinada com transfer learning. As camadas de features ficam congeladas, e a última camada é ajustada para duas classes.
+## Treinamento
 
-O arquivo `src/train.py` treina o modelo por 5 épocas usando:
+O arquivo `src/train.py` executa o treino por `5` épocas usando:
 
-- `CrossEntropyLoss`
-- otimizador `Adam`
-- `cuda`, se disponível, ou `cpu`
+- `CrossEntropyLoss`;
+- otimizador `Adam`;
+- taxa de aprendizado `0.001`;
+- `cuda`, se disponível, ou `cpu`.
 
-Durante o treino, o script calcula loss e accuracy em treino e validação. O melhor modelo é salvo em:
+Ao final de cada época, o modelo é validado. Sempre que a acurácia de validação melhora, o `state_dict` é salvo em:
 
 ```text
 models/best_model.pth
 ```
 
-## Como testar
+## Avaliação
 
-Ative o ambiente virtual do projeto e execute:
+O arquivo `src/evaluate.py` carrega o melhor modelo salvo e avalia o conjunto de teste.
+
+Ele calcula:
+
+- accuracy;
+- precision ponderada;
+- recall ponderado;
+- F1-score ponderado;
+- relatório de classificação;
+- matriz de confusão.
+
+Os resultados são salvos em:
+
+```text
+reports/classification_report.txt
+reports/confusion_matrix.png
+reports/predictions.csv
+```
+
+## Predição
+
+O arquivo `src/predict.py` faz inferência em uma única imagem:
+
+```powershell
+python src\predict.py --image caminho\para\imagem.jpg
+```
+
+A saída mostra:
+
+- caminho da imagem;
+- classe prevista;
+- confiança;
+- probabilidade por classe.
+
+## Interface Streamlit
+
+O arquivo `app/streamlit_app.py` disponibiliza uma interface simples para:
+
+- upload de imagem local;
+- predição a partir de URL direta de imagem;
+- exibição da imagem enviada;
+- exibição da classe prevista e das probabilidades.
+
+## Como testar o fluxo
 
 ```powershell
 python src\prepare_dataset.py
 python src\dataset.py
 python src\model.py
 python src\train.py
+python src\evaluate.py
+python src\predict.py --image caminho\para\imagem.jpg
+streamlit run app\streamlit_app.py
 ```
-
-Se o treino finalizar e `models/best_model.pth` for criado, a fase de treino está funcionando.
