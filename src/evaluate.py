@@ -1,3 +1,4 @@
+import argparse
 import matplotlib
 from pathlib import Path
 
@@ -16,10 +17,30 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from config import MODEL_PATH, PROJECT_ROOT, REPORTS_DIR
+from config import DEFAULT_ARCHITECTURE, MODEL_PATH, PROJECT_ROOT, REPORTS_DIR
 from dataset import create_dataloaders, create_datasets, create_transform
 from device import describe_device, get_device
-from model import create_model
+from model import SUPPORTED_ARCHITECTURES, create_model
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Avalia um checkpoint treinado no conjunto de teste.",
+    )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=MODEL_PATH,
+        help=f"Caminho do checkpoint do modelo. Padrão: {MODEL_PATH}",
+    )
+    parser.add_argument(
+        "--architecture",
+        default=DEFAULT_ARCHITECTURE,
+        choices=sorted(SUPPORTED_ARCHITECTURES),
+        help=f"Arquitetura usada pelo checkpoint. Padrão: {DEFAULT_ARCHITECTURE}",
+    )
+
+    return parser.parse_args()
 
 
 def get_test_data():
@@ -34,9 +55,15 @@ def get_test_data():
     return test_dataset, test_loader
 
 
-def load_model(device):
-    model = create_model(pretrained=False)
-    state_dict = torch.load(MODEL_PATH, map_location=device)
+def load_model(device, model_path, architecture=DEFAULT_ARCHITECTURE):
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Modelo não encontrado: {model_path}. "
+            "Treine um modelo ou informe --model-path com um checkpoint válido."
+        )
+
+    model = create_model(pretrained=False, architecture=architecture)
+    state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
@@ -125,15 +152,21 @@ def print_summary(accuracy, precision, recall, f1):
 
 
 def main():
+    args = parse_args()
+    model_path = args.model_path.resolve()
     device = get_device()
     print(f"Device usado: {describe_device(device)}")
+    print(f"Modelo usado: {model_path}")
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     test_dataset, test_loader = get_test_data()
     class_names = test_dataset.classes
 
-    model = load_model(device)
+    try:
+        model = load_model(device, model_path, args.architecture)
+    except FileNotFoundError as error:
+        raise SystemExit(f"Erro: {error}") from None
     labels, predictions = collect_predictions(model, test_loader, device)
 
     accuracy, precision, recall, f1, report, matrix = calculate_metrics(

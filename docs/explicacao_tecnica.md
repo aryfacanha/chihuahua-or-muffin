@@ -73,6 +73,8 @@ A estratégia é:
 
 Na avaliação e na inferência, a arquitetura é criada sem baixar pesos pré-treinados e recebe os pesos locais de `models/best_model.pth`.
 
+Por enquanto, a única arquitetura suportada explicitamente é `mobilenet_v2`. O código recebe o parâmetro `architecture` para facilitar a inclusão de outras arquiteturas futuramente, mas não adiciona novos modelos nesta versão.
+
 ## Treinamento
 
 O arquivo `src/train.py` executa o treino por `5` épocas usando:
@@ -82,15 +84,33 @@ O arquivo `src/train.py` executa o treino por `5` épocas usando:
 - taxa de aprendizado `0.001`;
 - `cuda`, se disponível, ou `cpu`.
 
-Ao final de cada época, o modelo é validado. Sempre que a acurácia de validação melhora, o `state_dict` é salvo em:
+Ao final de cada época, o modelo é validado. Sempre que a acurácia de validação melhora, o melhor `state_dict` é mantido. Ao final do treinamento, o checkpoint é salvo com o padrão:
 
 ```text
-models/best_model.pth
+models/chihuahua_muffin_mobilenet_v2_YYYYMMDD_HHMMSS_valacc_SCORE.pth
 ```
+
+O mesmo checkpoint é copiado para `models/best_model.pth` para manter compatibilidade com o fluxo antigo.
+
+O arquivo `models/model_history.csv` registra um histórico local com:
+
+- caminho do checkpoint;
+- arquitetura;
+- data de criação;
+- número de épocas;
+- melhor acurácia de validação;
+- caminho do dataset de treino;
+- observações.
+
+Esse histórico não é versionado porque representa execuções locais e aponta para arquivos de modelo também locais.
 
 ## Avaliação
 
-O arquivo `src/evaluate.py` carrega o melhor modelo salvo e avalia o conjunto de teste.
+O arquivo `src/evaluate.py` carrega um checkpoint salvo e avalia o conjunto de teste. Por padrão, usa `models/best_model.pth`, mas permite selecionar outro arquivo:
+
+```powershell
+python src\evaluate.py --model-path models\algum_modelo.pth
+```
 
 Ele calcula:
 
@@ -117,6 +137,12 @@ O arquivo `src/predict.py` faz inferência em uma única imagem:
 python src\predict.py --image caminho\para\imagem.jpg
 ```
 
+Também é possível escolher um checkpoint específico:
+
+```powershell
+python src\predict.py --image caminho\para\imagem.jpg --model-path models\algum_modelo.pth
+```
+
 A saída mostra:
 
 - caminho da imagem;
@@ -128,10 +154,13 @@ A saída mostra:
 
 O arquivo `app/streamlit_app.py` disponibiliza uma interface simples para:
 
+- seleção de checkpoint em `models/`;
 - upload de imagem local;
 - predição a partir de URL direta de imagem;
 - exibição da imagem enviada;
 - exibição da classe prevista e das probabilidades.
+
+O app não treina modelos e não depende do dataset de teste. Ele apenas carrega um checkpoint já existente e aplica a inferência na imagem enviada.
 
 ## Como testar o fluxo
 

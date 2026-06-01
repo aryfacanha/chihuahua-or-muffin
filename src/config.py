@@ -9,6 +9,8 @@ MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 
 MODEL_PATH = MODELS_DIR / "best_model.pth"
+MODEL_HISTORY_PATH = MODELS_DIR / "model_history.csv"
+DEFAULT_ARCHITECTURE = "mobilenet_v2"
 
 CLASSES = ["chihuahua", "muffin"]
 SPLITS = ["train", "val", "test"]

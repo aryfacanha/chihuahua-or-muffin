@@ -55,6 +55,28 @@ python src\predict.py --image caminho\para\imagem.jpg
 streamlit run app\streamlit_app.py
 ```
 
+## Checkpoints de modelo
+
+Ao final do treinamento, o melhor modelo é salvo com um nome que registra arquitetura, data, horário e acurácia de validação:
+
+```text
+models/chihuahua_muffin_mobilenet_v2_YYYYMMDD_HHMMSS_valacc_SCORE.pth
+```
+
+Exemplo:
+
+```text
+models/chihuahua_muffin_mobilenet_v2_20260601_143022_valacc_0.9472.pth
+```
+
+Para manter compatibilidade com o fluxo antigo, o mesmo checkpoint também é copiado para:
+
+```text
+models/best_model.pth
+```
+
+O arquivo `models/model_history.csv` registra um histórico local simples com caminho do checkpoint, arquitetura, data de criação, número de épocas, melhor acurácia de validação, caminho do dataset de treino e observações. Esse arquivo não é versionado porque descreve execuções locais e aponta para checkpoints que também não são versionados.
+
 ## Preparação do dataset
 
 Por padrão, o projeto espera o dataset bruto em `data/raw/kaggle/`:
@@ -131,3 +153,31 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 A versão `cu126` é apenas um exemplo. Escolha a opção correta para sua GPU, driver e sistema operacional.
 
 Durante treino ou avaliação, é normal a CPU ficar com uso alto mesmo quando o device exibido é `cuda`, porque a CPU ainda faz leitura das imagens, transforms, criação dos batches e envio dos tensores para a GPU.
+
+## Seleção de modelo
+
+Por padrão, avaliação, predição e app Streamlit usam `models/best_model.pth`.
+
+Para avaliar um checkpoint específico:
+
+```powershell
+python src\evaluate.py --model-path models\chihuahua_muffin_mobilenet_v2_YYYYMMDD_HHMMSS_valacc_SCORE.pth
+```
+
+Para fazer predição por terminal com um checkpoint específico:
+
+```powershell
+python src\predict.py --image caminho\para\imagem.jpg --model-path models\algum_modelo.pth
+```
+
+No Streamlit, o app lista automaticamente arquivos `.pth` e `.pt` dentro de `models/` e permite escolher o checkpoint em um seletor. Se `models/best_model.pth` existir, ele aparece selecionado por padrão.
+
+## Arquitetura suportada
+
+A arquitetura padrão e atualmente suportada é:
+
+```text
+mobilenet_v2
+```
+
+Os scripts aceitam `--architecture mobilenet_v2` para deixar explícita a arquitetura usada pelo checkpoint e facilitar a inclusão de outras arquiteturas no futuro.

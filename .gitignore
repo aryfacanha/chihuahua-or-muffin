@@ -9,6 +9,7 @@ __pycache__/
 # Ignora modelos treinados pesados
 models/*.pth
 models/*.pt
+models/model_history.csv
 
 # Ignora imagens/dados, mas mantem a estrutura com .gitkeep
 data/raw/**/*

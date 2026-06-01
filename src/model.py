@@ -2,11 +2,26 @@ import torch
 from torch import nn
 from torchvision import models
 
+from config import DEFAULT_ARCHITECTURE
 from dataset import create_dataloaders, create_datasets, create_transform
 from device import describe_device, get_device
 
+SUPPORTED_ARCHITECTURES = {DEFAULT_ARCHITECTURE}
 
-def create_model(num_classes=2, freeze_features=True, pretrained=True):
+
+def create_model(
+    num_classes=2,
+    freeze_features=True,
+    pretrained=True,
+    architecture=DEFAULT_ARCHITECTURE,
+):
+    if architecture != DEFAULT_ARCHITECTURE:
+        supported = ", ".join(sorted(SUPPORTED_ARCHITECTURES))
+        raise ValueError(
+            f"Arquitetura não suportada: {architecture}. "
+            f"Arquiteturas suportadas: {supported}"
+        )
+
     weights = models.MobileNet_V2_Weights.DEFAULT if pretrained else None
     model = models.mobilenet_v2(weights=weights)
 

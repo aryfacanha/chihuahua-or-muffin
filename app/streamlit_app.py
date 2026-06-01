@@ -15,15 +15,36 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
-from predict import CLASS_NAMES, MODEL_PATH, load_model, predict_image
+from config import MODEL_PATH, MODELS_DIR
 from device import get_device
+from predict import CLASS_NAMES, load_model, predict_image
 
 
 @st.cache_resource
-def get_model(device_name):
+def get_model(model_path, device_name):
     device = torch.device(device_name)
 
-    return load_model(device)
+    return load_model(device, Path(model_path))
+
+
+def list_model_files():
+    if not MODELS_DIR.exists():
+        return []
+
+    model_files = [
+        path
+        for path in MODELS_DIR.iterdir()
+        if path.is_file() and path.suffix.lower() in {".pth", ".pt"}
+    ]
+
+    return sorted(model_files)
+
+
+def get_default_model_index(model_files):
+    if MODEL_PATH in model_files:
+        return model_files.index(MODEL_PATH)
+
+    return 0
 
 
 def load_image_from_url(image_url):
@@ -38,9 +59,9 @@ def load_image_from_url(image_url):
     return Image.open(BytesIO(image_bytes)).convert("RGB")
 
 
-def show_prediction(image):
+def show_prediction(image, model_path):
     device = get_device()
-    model = get_model(str(device))
+    model = get_model(str(model_path), str(device))
     predicted_index, confidence, probabilities = predict_image(
         model,
         image,
@@ -67,12 +88,21 @@ def main():
         "chihuahua ou um muffin."
     )
 
-    if not MODEL_PATH.exists():
+    model_files = list_model_files()
+
+    if not model_files:
         st.error(
-            "Modelo treinado não encontrado. Execute o treino primeiro para "
-            "gerar `models/best_model.pth`."
+            "Nenhum modelo treinado foi encontrado. Execute `python "
+            "src\\train.py` para gerar um checkpoint em `models/`."
         )
         return
+
+    selected_model = st.selectbox(
+        "Modelo",
+        model_files,
+        index=get_default_model_index(model_files),
+        format_func=lambda path: path.name,
+    )
 
     upload_tab, link_tab = st.tabs(["Upload", "Link"])
 
@@ -85,7 +115,7 @@ def main():
         if uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
             st.image(image, caption="Imagem enviada", use_container_width=True)
-            show_prediction(image)
+            show_prediction(image, selected_model)
 
     with link_tab:
         image_url = st.text_input("Cole o link da imagem")
@@ -94,7 +124,7 @@ def main():
             try:
                 image = load_image_from_url(image_url)
                 st.image(image, caption="Imagem do link", use_container_width=True)
-                show_prediction(image)
+                show_prediction(image, selected_model)
             except (URLError, TimeoutError, UnidentifiedImageError, OSError):
                 st.error(
                     "Não foi possível carregar a imagem pelo link. "

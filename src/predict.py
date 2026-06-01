@@ -5,20 +5,32 @@ import torch
 from PIL import Image
 
 from config import CLASSES as CLASS_NAMES
-from config import MODEL_PATH
+from config import DEFAULT_ARCHITECTURE, MODEL_PATH
 from dataset import create_transform
 from device import get_device
-from model import create_model
+from model import SUPPORTED_ARCHITECTURES, create_model
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Faz predicao de uma imagem usando o modelo treinado.",
+        description="Faz predição de uma imagem usando o modelo treinado.",
     )
     parser.add_argument(
         "--image",
         required=True,
-        help="Caminho da imagem para classificacao.",
+        help="Caminho da imagem para classificação.",
+    )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=MODEL_PATH,
+        help=f"Caminho do checkpoint do modelo. Padrão: {MODEL_PATH}",
+    )
+    parser.add_argument(
+        "--architecture",
+        default=DEFAULT_ARCHITECTURE,
+        choices=sorted(SUPPORTED_ARCHITECTURES),
+        help=f"Arquitetura usada pelo checkpoint. Padrão: {DEFAULT_ARCHITECTURE}",
     )
 
     return parser.parse_args()
@@ -37,9 +49,17 @@ def prepare_image(image):
     return image_tensor
 
 
-def load_model(device):
-    model = create_model(pretrained=False)
-    state_dict = torch.load(MODEL_PATH, map_location=device)
+def load_model(device, model_path=MODEL_PATH, architecture=DEFAULT_ARCHITECTURE):
+    model_path = Path(model_path)
+
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Modelo não encontrado: {model_path}. "
+            "Treine um modelo ou informe --model-path com um checkpoint válido."
+        )
+
+    model = create_model(pretrained=False, architecture=architecture)
+    state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
@@ -67,7 +87,7 @@ def predict_image(model, image, device):
 def print_prediction(image_path, predicted_index, confidence, probabilities):
     print(f"Caminho da imagem: {image_path}")
     print(f"Classe prevista: {CLASS_NAMES[predicted_index]}")
-    print(f"Confianca: {confidence:.4f}")
+    print(f"Confiança: {confidence:.4f}")
     print("\nProbabilidade por classe:")
 
     for class_name, probability in zip(CLASS_NAMES, probabilities):
@@ -77,14 +97,18 @@ def print_prediction(image_path, predicted_index, confidence, probabilities):
 def main():
     args = parse_args()
     image_path = Path(args.image)
+    model_path = args.model_path.resolve()
 
     if not image_path.exists():
-        raise FileNotFoundError(f"Imagem nao encontrada: {image_path}")
+        raise FileNotFoundError(f"Imagem não encontrada: {image_path}")
 
     device = get_device()
 
     image_tensor = load_image(image_path)
-    model = load_model(device)
+    try:
+        model = load_model(device, model_path, args.architecture)
+    except FileNotFoundError as error:
+        raise SystemExit(f"Erro: {error}") from None
     predicted_index, confidence, probabilities = predict(
         model,
         image_tensor,
