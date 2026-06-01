@@ -15,6 +15,12 @@ A solução cobre o fluxo completo: preparação do dataset, carregamento com Py
 
 O arquivo `src/prepare_dataset.py` lê as imagens brutas em `data/raw/kaggle/`.
 
+Esse caminho é o padrão do projeto, mas pode ser alterado pela CLI:
+
+```powershell
+python src\prepare_dataset.py --raw-dir path\to\raw_dataset
+```
+
 Ele procura recursivamente as classes `chihuahua` e `muffin`, embaralha as imagens com seed fixa e divide os dados em:
 
 ```text
@@ -22,6 +28,14 @@ Ele procura recursivamente as classes `chihuahua` e `muffin`, embaralha as image
 15% val
 15% test
 ```
+
+As proporções também podem ser configuradas:
+
+```powershell
+python src\prepare_dataset.py --train-ratio 0.7 --val-ratio 0.15 --test-ratio 0.15
+```
+
+Antes de copiar os arquivos, o script valida o diretório bruto, as pastas das classes, a existência de imagens suportadas e a soma das proporções. Ao final, imprime um resumo com os caminhos usados, classes e contagens por split.
 
 As imagens são copiadas para `data/processed/`, mantendo a estrutura esperada pelo PyTorch:
 

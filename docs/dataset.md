@@ -36,6 +36,35 @@ O arquivo `src/prepare_dataset.py` combina as imagens encontradas por classe, em
 15% test
 ```
 
+Uso com o caminho padrão:
+
+```powershell
+python src\prepare_dataset.py
+```
+
+Uso com dataset bruto customizado:
+
+```powershell
+python src\prepare_dataset.py --raw-dir path\to\raw_dataset
+```
+
+Uso com saída e proporções customizadas:
+
+```powershell
+python src\prepare_dataset.py --output-dir data\processed
+python src\prepare_dataset.py --train-ratio 0.7 --val-ratio 0.15 --test-ratio 0.15
+```
+
+O script valida:
+
+- se o diretório bruto existe;
+- se existem pastas para as classes esperadas;
+- se existem imagens com extensões suportadas;
+- se as proporções somam `1.0`;
+- se a pasta de saída pode ser criada.
+
+Ao final, ele imprime um resumo com origem, saída, proporções, seed, classes e quantidade de imagens por classe e split.
+
 ## Organização processada
 
 Após a preparação, o dataset fica em:

@@ -55,6 +55,24 @@ python src\predict.py --image caminho\para\imagem.jpg
 streamlit run app\streamlit_app.py
 ```
 
+## Preparação do dataset
+
+Por padrão, o projeto espera o dataset bruto em `data/raw/kaggle/`:
+
+```powershell
+python src\prepare_dataset.py
+```
+
+Também é possível informar caminhos e proporções customizadas:
+
+```powershell
+python src\prepare_dataset.py --raw-dir path\to\raw_dataset
+python src\prepare_dataset.py --output-dir data\processed
+python src\prepare_dataset.py --train-ratio 0.7 --val-ratio 0.15 --test-ratio 0.15
+```
+
+O script valida a existência do dataset bruto, as pastas das classes, os arquivos de imagem suportados e se as proporções somam `1.0`.
+
 ## Status
 
 Etapas concluídas:
@@ -85,7 +103,7 @@ A avaliação salva em `reports/classification_report.txt` indica aproximadament
 2. Instale as dependências com `pip install -r requirements.txt`.
 3. Baixe o dataset "Muffin vs Chihuahua" do Kaggle.
 4. Organize o dataset bruto em `data/raw/kaggle/`.
-5. Execute `python src\prepare_dataset.py`.
+5. Execute `python src\prepare_dataset.py` ou informe outro dataset com `--raw-dir`.
 6. Execute `python src\train.py` para gerar `models/best_model.pth`.
 7. Execute `python src\evaluate.py` para gerar os relatórios.
 
