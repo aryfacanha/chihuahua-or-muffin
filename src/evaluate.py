@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -17,13 +15,9 @@ from sklearn.metrics import (
     recall_score,
 )
 
+from config import MODEL_PATH, REPORTS_DIR
 from dataset import create_dataloaders, create_datasets, create_transform
 from model import create_model
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-MODEL_PATH = PROJECT_ROOT / "models" / "best_model.pth"
-REPORTS_DIR = PROJECT_ROOT / "reports"
 
 
 def get_test_data():
@@ -39,7 +33,7 @@ def get_test_data():
 
 
 def load_model(device):
-    model = create_model()
+    model = create_model(pretrained=False)
     state_dict = torch.load(MODEL_PATH, map_location=device)
     model.load_state_dict(state_dict)
     model = model.to(device)

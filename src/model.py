@@ -5,8 +5,8 @@ from torchvision import models
 from dataset import create_dataloaders, create_datasets, create_transform
 
 
-def create_model(num_classes=2, freeze_features=True):
-    weights = models.MobileNet_V2_Weights.DEFAULT
+def create_model(num_classes=2, freeze_features=True, pretrained=True):
+    weights = models.MobileNet_V2_Weights.DEFAULT if pretrained else None
     model = models.mobilenet_v2(weights=weights)
 
     if freeze_features:

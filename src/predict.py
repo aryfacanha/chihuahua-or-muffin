@@ -4,13 +4,10 @@ from pathlib import Path
 import torch
 from PIL import Image
 
+from config import CLASSES as CLASS_NAMES
+from config import MODEL_PATH
 from dataset import create_transform
 from model import create_model
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-MODEL_PATH = PROJECT_ROOT / "models" / "best_model.pth"
-CLASS_NAMES = ["chihuahua", "muffin"]
 
 
 def parse_args():
@@ -40,7 +37,7 @@ def prepare_image(image):
 
 
 def load_model(device):
-    model = create_model()
+    model = create_model(pretrained=False)
     state_dict = torch.load(MODEL_PATH, map_location=device)
     model.load_state_dict(state_dict)
     model = model.to(device)
