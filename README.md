@@ -108,3 +108,26 @@ A avaliação salva em `reports/classification_report.txt` indica aproximadament
 7. Execute `python src\evaluate.py` para gerar os relatórios.
 
 Para usar GPU com CUDA, instale a versão de PyTorch compatível com a máquina seguindo a documentação oficial do PyTorch.
+
+## CPU e GPU
+
+O projeto seleciona automaticamente o dispositivo de execução:
+
+- usa `cuda` quando o PyTorch instalado tem suporte CUDA funcional;
+- usa `cpu` quando CUDA não está disponível.
+
+O `requirements.txt` mantém `torch` e `torchvision` genéricos para facilitar a instalação em CPU. Para usar GPU NVIDIA, instale o PyTorch com a versão CUDA compatível com sua máquina seguindo o comando oficial em:
+
+```text
+https://pytorch.org/get-started/locally/
+```
+
+Exemplo de instalação com CUDA:
+
+```powershell
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+```
+
+A versão `cu126` é apenas um exemplo. Escolha a opção correta para sua GPU, driver e sistema operacional.
+
+Durante treino ou avaliação, é normal a CPU ficar com uso alto mesmo quando o device exibido é `cuda`, porque a CPU ainda faz leitura das imagens, transforms, criação dos batches e envio dos tensores para a GPU.
