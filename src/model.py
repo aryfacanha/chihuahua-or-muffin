@@ -3,6 +3,7 @@ from torch import nn
 from torchvision import models
 
 from dataset import create_dataloaders, create_datasets, create_transform
+from device import describe_device, get_device
 
 
 def create_model(num_classes=2, freeze_features=True, pretrained=True):
@@ -32,7 +33,7 @@ def count_trainable_parameters(model):
 
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
 
     transform = create_transform()
     train_dataset, val_dataset, test_dataset = create_datasets(transform)
@@ -52,7 +53,7 @@ def main():
     with torch.no_grad():
         outputs = model(images)
 
-    print(f"Device usado: {device}")
+    print(f"Device usado: {describe_device(device)}")
     print(f"Shape do batch de entrada: {images.shape}")
     print(f"Shape da saida do modelo: {outputs.shape}")
     print(f"Quantidade total de parametros: {count_parameters(model)}")

@@ -16,6 +16,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from predict import CLASS_NAMES, MODEL_PATH, load_model, predict_image
+from device import get_device
 
 
 @st.cache_resource
@@ -38,7 +39,7 @@ def load_image_from_url(image_url):
 
 
 def show_prediction(image):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     model = get_model(str(device))
     predicted_index, confidence, probabilities = predict_image(
         model,

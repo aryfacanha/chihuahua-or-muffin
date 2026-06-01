@@ -7,6 +7,7 @@ from PIL import Image
 from config import CLASSES as CLASS_NAMES
 from config import MODEL_PATH
 from dataset import create_transform
+from device import get_device
 from model import create_model
 
 
@@ -80,7 +81,7 @@ def main():
     if not image_path.exists():
         raise FileNotFoundError(f"Imagem nao encontrada: {image_path}")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
 
     image_tensor = load_image(image_path)
     model = load_model(device)

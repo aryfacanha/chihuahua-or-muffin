@@ -18,6 +18,7 @@ from sklearn.metrics import (
 
 from config import MODEL_PATH, PROJECT_ROOT, REPORTS_DIR
 from dataset import create_dataloaders, create_datasets, create_transform
+from device import describe_device, get_device
 from model import create_model
 
 
@@ -124,8 +125,8 @@ def print_summary(accuracy, precision, recall, f1):
 
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device usado: {device}")
+    device = get_device()
+    print(f"Device usado: {describe_device(device)}")
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 

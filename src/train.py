@@ -3,6 +3,7 @@ from torch import nn, optim
 
 from config import EPOCHS, LEARNING_RATE, MODEL_PATH
 from dataset import create_dataloaders, create_datasets, create_transform
+from device import describe_device, get_device
 from model import create_model
 
 
@@ -61,8 +62,8 @@ def validate(model, val_loader, criterion, device):
 
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device usado: {device}")
+    device = get_device()
+    print(f"Device usado: {describe_device(device)}")
 
     transform = create_transform()
     train_dataset, val_dataset, test_dataset = create_datasets(transform)
