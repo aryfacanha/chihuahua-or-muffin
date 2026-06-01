@@ -10,14 +10,14 @@ __pycache__/
 models/*.pth
 models/*.pt
 
-# Ignora predicoes com caminhos locais
-reports/predictions.csv
-
-# Ignora imagens/dados, mas mantém a estrutura com .gitkeep
+# Ignora imagens/dados, mas mantem a estrutura com .gitkeep
 data/raw/**/*
 data/processed/**/*
+
+reports/*
 
 !data/raw/**/
 !data/raw/**/.gitkeep
 !data/processed/**/
 !data/processed/**/.gitkeep
+!reports/.gitkeep

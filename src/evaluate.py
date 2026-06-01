@@ -1,4 +1,5 @@
 import matplotlib
+from pathlib import Path
 
 matplotlib.use("Agg")
 
@@ -15,7 +16,7 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from config import MODEL_PATH, REPORTS_DIR
+from config import MODEL_PATH, PROJECT_ROOT, REPORTS_DIR
 from dataset import create_dataloaders, create_datasets, create_transform
 from model import create_model
 
@@ -102,8 +103,9 @@ def save_predictions(test_dataset, labels, predictions, class_names):
     rows = []
 
     for image_path, label, prediction in zip(image_paths, labels, predictions):
+        relative_image_path = Path(image_path).relative_to(PROJECT_ROOT)
         rows.append({
-            "image_path": image_path,
+            "image_path": relative_image_path.as_posix(),
             "true_label": class_names[label],
             "predicted_label": class_names[prediction],
         })
