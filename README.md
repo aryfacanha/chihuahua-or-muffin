@@ -1,14 +1,11 @@
 # Chihuahua or Muffin
 
-Projeto acadêmico desenvolvido para a disciplina de Tópicos Especiais em Computação.
+Projeto acadêmico de Visão Computacional para classificar imagens entre duas classes:
 
-## Objetivo
+- `chihuahua`
+- `muffin`
 
-Criar uma prova de conceito de classificação binária de imagens capaz de distinguir entre imagens de chihuahuas e muffins.
-
-## Problema
-
-Chihuahuas e muffins podem ter padrões visuais semelhantes em determinadas imagens, especialmente quando olhos, nariz, manchas e textura aparecem de forma parecida. O projeto utiliza Visão Computacional e Aprendizado Profundo para treinar um classificador capaz de diferenciar as duas classes.
+A proposta é demonstrar um pipeline completo de aprendizado profundo com PyTorch: preparação do dataset, treinamento com transfer learning, avaliação, inferência por CLI e visualização local pelo Streamlit.
 
 ## Tecnologias
 
@@ -22,62 +19,40 @@ Chihuahuas e muffins podem ter padrões visuais semelhantes em determinadas imag
 - Pandas
 - Streamlit
 
-## Estratégia
+## Instalação
 
-O projeto utiliza transfer learning com MobileNetV2 pré-treinada no ImageNet. As camadas extratoras de características são congeladas e a camada final é substituída por uma camada linear com duas saídas:
-
-- `chihuahua`
-- `muffin`
-
-## Estrutura
-
-```text
-app/                 Interface Streamlit
-data/raw/kaggle/     Dataset bruto local do Kaggle
-data/processed/      Dataset organizado em train, val e test
-docs/                Documentação acadêmica
-models/              Pesos treinados locais
-reports/             Relatórios de avaliação
-src/                 Código principal do pipeline
-```
-
-Os dados e modelos treinados são ignorados pelo Git para evitar versionar arquivos pesados ou dependentes da máquina local.
-
-## Fluxo principal
+Crie e ative um ambiente virtual:
 
 ```powershell
-python src\prepare_dataset.py
-python src\dataset.py
-python src\model.py
-python src\train.py
-python src\evaluate.py
-python src\predict.py --image caminho\para\imagem.jpg
-streamlit run app\streamlit_app.py
+python -m venv .venv
+.venv\Scripts\activate
 ```
 
-## Checkpoints de modelo
+Instale as dependências:
 
-Ao final do treinamento, o melhor modelo é salvo com um nome que registra arquitetura, data, horário e acurácia de validação:
+```powershell
+pip install -r requirements.txt
+```
+
+O `requirements.txt` mantém `torch` e `torchvision` genéricos para facilitar a instalação em CPU. Para usar GPU NVIDIA com CUDA, instale o PyTorch com a versão compatível com sua máquina seguindo o comando oficial em:
 
 ```text
-models/chihuahua_muffin_mobilenet_v2_YYYYMMDD_HHMMSS_valacc_SCORE.pth
+https://pytorch.org/get-started/locally/
 ```
 
-Exemplo:
+## Estrutura do Projeto
 
 ```text
-models/chihuahua_muffin_mobilenet_v2_20260601_143022_valacc_0.9472.pth
+app/                 Interface Streamlit local
+data/raw/kaggle/     Dataset bruto local
+data/processed/      Dataset separado em train, val e test
+docs/                Documentação acadêmica
+models/              Checkpoints treinados locais
+reports/             Relatórios e histórico de avaliações locais
+src/                 Scripts principais do pipeline
 ```
 
-Para manter compatibilidade com o fluxo antigo, o mesmo checkpoint também é copiado para:
-
-```text
-models/best_model.pth
-```
-
-O arquivo `models/model_history.csv` registra um histórico local simples com caminho do checkpoint, arquitetura, data de criação, número de épocas, melhor acurácia de validação, caminho do dataset de treino e observações. Esse arquivo não é versionado porque descreve execuções locais e aponta para checkpoints que também não são versionados.
-
-## Preparação do dataset
+## Preparação do Dataset
 
 Por padrão, o projeto espera o dataset bruto em `data/raw/kaggle/`:
 
@@ -85,99 +60,151 @@ Por padrão, o projeto espera o dataset bruto em `data/raw/kaggle/`:
 python src\prepare_dataset.py
 ```
 
-Também é possível informar caminhos e proporções customizadas:
+Também é possível informar outro caminho:
 
 ```powershell
 python src\prepare_dataset.py --raw-dir path\to\raw_dataset
-python src\prepare_dataset.py --output-dir data\processed
+```
+
+O script separa os dados em `train`, `val` e `test`, usando a divisão padrão `70/15/15`. As proporções podem ser configuradas:
+
+```powershell
 python src\prepare_dataset.py --train-ratio 0.7 --val-ratio 0.15 --test-ratio 0.15
 ```
 
-O script valida a existência do dataset bruto, as pastas das classes, os arquivos de imagem suportados e se as proporções somam `1.0`.
+## Treinamento por CLI
 
-## Status
-
-Etapas concluídas:
-
-- Preparação do dataset em `train`, `val` e `test`.
-- Carregamento do dataset com PyTorch.
-- Modelo com transfer learning usando MobileNetV2.
-- Treinamento com validação e salvamento do melhor modelo.
-- Avaliação no conjunto de teste.
-- Geração de relatório de classificação e matriz de confusão.
-- Predição individual por terminal.
-- Interface Streamlit com upload de imagem e predição por URL.
-
-## Resultados atuais
-
-A avaliação salva em `reports/classification_report.txt` indica aproximadamente `0.99` de accuracy, precision, recall e F1-score no conjunto de teste local.
-
-## Limitações
-
-- O modelo depende da qualidade e diversidade do dataset.
-- O classificador foi treinado apenas para distinguir chihuahuas e muffins.
-- Imagens fora desse domínio ainda recebem uma das duas classes.
-- A confiança do modelo representa a probabilidade estimada entre as classes conhecidas, não uma certeza absoluta.
-
-## Setup em máquina nova
-
-1. Crie e ative um ambiente virtual.
-2. Instale as dependências com `pip install -r requirements.txt`.
-3. Baixe o dataset "Muffin vs Chihuahua" do Kaggle.
-4. Organize o dataset bruto em `data/raw/kaggle/`.
-5. Execute `python src\prepare_dataset.py` ou informe outro dataset com `--raw-dir`.
-6. Execute `python src\train.py` para gerar `models/best_model.pth`.
-7. Execute `python src\evaluate.py` para gerar os relatórios.
-
-Para usar GPU com CUDA, instale a versão de PyTorch compatível com a máquina seguindo a documentação oficial do PyTorch.
-
-## CPU e GPU
-
-O projeto seleciona automaticamente o dispositivo de execução:
-
-- usa `cuda` quando o PyTorch instalado tem suporte CUDA funcional;
-- usa `cpu` quando CUDA não está disponível.
-
-O `requirements.txt` mantém `torch` e `torchvision` genéricos para facilitar a instalação em CPU. Para usar GPU NVIDIA, instale o PyTorch com a versão CUDA compatível com sua máquina seguindo o comando oficial em:
-
-```text
-https://pytorch.org/get-started/locally/
-```
-
-Exemplo de instalação com CUDA:
+O treinamento ainda é feito pela linha de comando:
 
 ```powershell
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+python src\train.py
 ```
 
-A versão `cu126` é apenas um exemplo. Escolha a opção correta para sua GPU, driver e sistema operacional.
+O modelo usa transfer learning com `mobilenet_v2`. Ao final, o melhor checkpoint é salvo com o padrão:
 
-Durante treino ou avaliação, é normal a CPU ficar com uso alto mesmo quando o device exibido é `cuda`, porque a CPU ainda faz leitura das imagens, transforms, criação dos batches e envio dos tensores para a GPU.
+```text
+models/chihuahua_muffin_mobilenet_v2_YYYYMMDD_HHMMSS_valacc_SCORE.pth
+```
 
-## Seleção de modelo
+Para manter compatibilidade com o fluxo simples, o mesmo checkpoint também é copiado para:
 
-Por padrão, avaliação, predição e app Streamlit usam `models/best_model.pth`.
+```text
+models/best_model.pth
+```
+
+O arquivo local `models/model_history.csv` registra informações dos treinamentos, como caminho do checkpoint, arquitetura, data de criação, épocas, melhor acurácia de validação e observações.
+
+## Avaliação por CLI
+
+Para avaliar o modelo padrão:
+
+```powershell
+python src\evaluate.py
+```
 
 Para avaliar um checkpoint específico:
 
 ```powershell
-python src\evaluate.py --model-path models\chihuahua_muffin_mobilenet_v2_YYYYMMDD_HHMMSS_valacc_SCORE.pth
+python src\evaluate.py --model-path models\algum_modelo.pth
 ```
 
-Para fazer predição por terminal com um checkpoint específico:
+Cada avaliação gera uma pasta própria em:
+
+```text
+reports/evaluations/{model_stem}_{YYYYMMDD_HHMMSS}/
+```
+
+Dentro dela são salvos:
+
+```text
+classification_report.txt
+confusion_matrix.png
+predictions.csv
+metrics.json
+```
+
+O arquivo `reports/evaluation_history.csv` funciona como índice global das avaliações. Além disso, o projeto mantém um histórico por modelo em:
+
+```text
+reports/evaluations/by_model/{model_stem}/evaluation_history.csv
+```
+
+Por compatibilidade, os últimos resultados também são copiados para:
+
+```text
+reports/classification_report.txt
+reports/confusion_matrix.png
+reports/predictions.csv
+```
+
+## Inferência por CLI
+
+Para classificar uma imagem usando o modelo padrão:
+
+```powershell
+python src\predict.py --image caminho\para\imagem.jpg
+```
+
+Para escolher um checkpoint específico:
 
 ```powershell
 python src\predict.py --image caminho\para\imagem.jpg --model-path models\algum_modelo.pth
 ```
 
-No Streamlit, o app lista automaticamente arquivos `.pth` e `.pt` dentro de `models/` e permite escolher o checkpoint em um seletor. Se `models/best_model.pth` existir, ele aparece selecionado por padrão.
+A saída mostra classe prevista, confiança e probabilidade por classe.
 
-## Arquitetura suportada
+## Streamlit
 
-A arquitetura padrão e atualmente suportada é:
+O Streamlit é uma interface local e acadêmica para inferência, status do projeto e visualização de avaliações. Ele não executa treinamento e não prepara dataset por botão nesta versão.
 
-```text
-mobilenet_v2
+Para abrir:
+
+```powershell
+streamlit run app\streamlit_app.py
 ```
 
-Os scripts aceitam `--architecture mobilenet_v2` para deixar explícita a arquitetura usada pelo checkpoint e facilitar a inclusão de outras arquiteturas no futuro.
+Telas disponíveis:
+
+- `Início`: resumo do projeto, status do dataset, modelos e avaliações.
+- `Inferência`: seleção de checkpoint, upload ou link de imagem e predição.
+- `Dataset`: status dos splits e contagem de imagens por classe.
+- `Dashboard de Avaliação`: métricas, matriz de confusão, relatório e predições de uma avaliação já gerada.
+- `Histórico de Avaliações`: tabela com avaliações salvas em `reports/evaluation_history.csv`.
+- `Histórico de Modelos`: modelos encontrados em `models/` e conteúdo de `models/model_history.csv`, se existir.
+
+## Arquivos Ignorados pelo Git
+
+O repositório ignora artefatos locais e arquivos pesados:
+
+- `.venv/`
+- `__pycache__/`
+- arquivos `.pyc`
+- `models/*.pth`
+- `models/*.pt`
+- `models/model_history.csv`
+- imagens em `data/raw/`
+- imagens em `data/processed/`
+- arquivos em `reports/`
+
+A estrutura de algumas pastas é mantida com `.gitkeep`.
+
+## Fluxo Recomendado em uma Máquina Nova
+
+1. Clone o repositório.
+2. Crie e ative o ambiente virtual.
+3. Instale as dependências com `pip install -r requirements.txt`.
+4. Baixe o dataset "Muffin vs Chihuahua" do Kaggle.
+5. Organize o dataset bruto em `data/raw/kaggle/`.
+6. Execute `python src\prepare_dataset.py`.
+7. Execute `python src\train.py`.
+8. Execute `python src\evaluate.py`.
+9. Teste inferência por CLI com `python src\predict.py --image caminho\para\imagem.jpg`.
+10. Abra a interface com `streamlit run app\streamlit_app.py`.
+
+## Limitações
+
+- O modelo só distingue as classes treinadas: `chihuahua` e `muffin`.
+- Imagens fora desse domínio ainda recebem uma das duas classes.
+- A qualidade do resultado depende da diversidade e qualidade do dataset.
+- Treinamento em CPU pode demorar.
+- O Streamlit ainda não executa treinamento nem preparação de dataset pela interface.
