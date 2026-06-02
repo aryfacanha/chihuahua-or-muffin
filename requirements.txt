@@ -1,4 +1,5 @@
 kagglehub
+kagglesdk<0.1.24
 torch
 torchvision
 pillow
