@@ -26,6 +26,7 @@ A ideia é construir um pipeline simples e reproduzível com PyTorch: preparar o
 app/                 Interface Streamlit local
 data/raw/kaggle/     Dataset bruto local
 data/processed/      Dataset separado em train, val e test
+data/hard_cases/     Imagens ambíguas separadas para diagnóstico
 docs/                Documentação acadêmica
 models/              Checkpoints treinados locais
 reports/             Relatórios e histórico de avaliações locais
@@ -145,6 +146,45 @@ data/processed/test/
 
 A divisão padrão é `70%` treino, `15%` validação e `15%` teste.
 
+## Casos Ambíguos
+
+O projeto também prevê uma área separada para imagens ambíguas ou difíceis, que servem para diagnóstico do comportamento do modelo. Esses arquivos não fazem parte automaticamente do dataset principal processado em `data/processed/`.
+
+A estrutura esperada é:
+
+```text
+data/hard_cases/
+├── train/
+│   ├── chihuahua/
+│   └── muffin/
+├── val/
+│   ├── chihuahua/
+│   └── muffin/
+└── test/
+    ├── chihuahua/
+    └── muffin/
+```
+
+Casos de uso:
+
+- inspecionar imagens reais em que chihuahua e muffin são visualmente parecidos;
+- testar se o modelo está muito confiante em exemplos ambíguos;
+- comparar resultados entre checkpoints diferentes;
+- analisar erros antes de decidir alterar dataset, treinamento ou hiperparâmetros;
+- usar `data/hard_cases/test/` como conjunto separado para avaliação final de exemplos difíceis.
+
+O diagnóstico por terminal pode ser executado com:
+
+```powershell
+python src\evaluate_hard_cases.py --model-path models\best_model.pth
+```
+
+Os resultados são salvos em:
+
+```text
+reports/hard_cases/
+```
+
 ## Modelo e Checkpoints
 
 O projeto usa transfer learning com `mobilenet_v2`.
@@ -227,6 +267,7 @@ Telas disponíveis:
 - `Dashboard de Avaliação`: métricas, matriz de confusão, relatório e predições.
 - `Histórico de Avaliações`: tabela com avaliações salvas.
 - `Histórico de Modelos`: checkpoints disponíveis e histórico local de modelos.
+- `Casos Ambíguos`: inferência em lote nas imagens de `data/hard_cases/`.
 
 Para abrir:
 
@@ -246,6 +287,7 @@ O `.gitignore` ignora artefatos locais e arquivos pesados:
 - `models/model_history.csv`
 - imagens em `data/raw/`
 - imagens em `data/processed/`
+- imagens em `data/hard_cases/`
 - arquivos em `reports/`
 
 ## Limitações
