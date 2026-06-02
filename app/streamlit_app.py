@@ -1,5 +1,6 @@
 import json
 import sys
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.error import URLError
@@ -18,6 +19,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from config import (
+    CLASSES,
+    HARD_CASES_DATA_DIR,
     IMAGE_EXTENSIONS,
     MODEL_HISTORY_PATH,
     MODEL_PATH,
@@ -37,6 +40,7 @@ PAGES = [
     "Dashboard de Avaliação",
     "Histórico de Avaliações",
     "Histórico de Modelos",
+    "Casos Ambíguos",
 ]
 
 
@@ -220,7 +224,79 @@ def load_image_from_url(image_url):
     return Image.open(BytesIO(image_bytes)).convert("RGB")
 
 
-def show_prediction(image, model_path):
+def classify_uncertainty(confidence, probabilities):
+    probability_values = [probability.item() for probability in probabilities]
+    sorted_probabilities = sorted(probability_values, reverse=True)
+    margin = sorted_probabilities[0] - sorted_probabilities[1]
+
+    if confidence < 0.60 or margin < 0.20:
+        return {
+            "level": "alta",
+            "message": (
+                "Predição incerta. As probabilidades estão próximas, então "
+                "esta é uma região onde o modelo tende a errar mais."
+            ),
+            "color": "warning",
+        }
+
+    if confidence < 0.75 or margin < 0.50:
+        return {
+            "level": "moderada",
+            "message": (
+                "Predição razoável, mas ainda ambígua. Vale revisar a imagem "
+                "antes de tratar o resultado como definitivo."
+            ),
+            "color": "info",
+        }
+
+    return {
+        "level": "baixa",
+        "message": (
+            "Predição mais estável para o modelo atual. Ainda assim, a saída "
+            "é uma estimativa probabilística, não uma garantia."
+        ),
+        "color": "success",
+    }
+
+
+def add_inference_history(row):
+    if "inference_history" not in st.session_state:
+        st.session_state.inference_history = []
+
+    existing_keys = {
+        history_row["history_key"]
+        for history_row in st.session_state.inference_history
+    }
+
+    if row["history_key"] in existing_keys:
+        return
+
+    st.session_state.inference_history.insert(0, row)
+
+
+def show_colored_prediction_status(predicted_label, true_label):
+    if true_label == "-":
+        st.info("Sem classe real informada. O app mostra apenas a predição.")
+        return None
+
+    if predicted_label == true_label:
+        st.success("Resultado correto para a classe real informada.")
+        return True
+
+    st.error("Resultado incorreto para a classe real informada.")
+    return False
+
+
+def show_uncertainty_message(uncertainty):
+    if uncertainty["color"] == "success":
+        st.success(uncertainty["message"])
+    elif uncertainty["color"] == "warning":
+        st.warning(uncertainty["message"])
+    else:
+        st.info(uncertainty["message"])
+
+
+def show_prediction(image, model_path, source, true_label="-"):
     device = get_device()
     model = get_model(str(model_path), str(device))
     predicted_index, confidence, probabilities = predict_image(
@@ -228,14 +304,181 @@ def show_prediction(image, model_path):
         image,
         device,
     )
+    predicted_label = CLASS_NAMES[predicted_index]
+    uncertainty = classify_uncertainty(confidence, probabilities)
+    correct = show_colored_prediction_status(predicted_label, true_label)
 
     st.subheader("Resultado")
-    st.write(f"Classe prevista: **{CLASS_NAMES[predicted_index]}**")
+    st.write(f"Classe prevista: **{predicted_label}**")
     st.write(f"Confiança: **{confidence:.2%}**")
+
+    st.write(f"Grau de incerteza: **{uncertainty['level']}**")
+    show_uncertainty_message(uncertainty)
 
     st.write("Probabilidades:")
     st.write(f"Chihuahua: **{probabilities[0].item():.2%}**")
     st.write(f"Muffin: **{probabilities[1].item():.2%}**")
+
+    add_inference_history({
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "source": source,
+        "model": Path(model_path).name,
+        "true_label": true_label,
+        "predicted_label": predicted_label,
+        "confidence": confidence,
+        "uncertainty": uncertainty["level"],
+        "correct": correct,
+        "chihuahua_probability": probabilities[0].item(),
+        "muffin_probability": probabilities[1].item(),
+        "history_key": (
+            f"{Path(model_path).name}|{source}|{true_label}|"
+            f"{predicted_label}|{confidence:.6f}"
+        ),
+    })
+
+
+def is_supported_image(path):
+    return path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+
+
+def relative_path(path):
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def collect_hard_case_images(split):
+    split_dir = HARD_CASES_DATA_DIR / split
+    samples = []
+
+    if not split_dir.exists():
+        return samples
+
+    for class_name in CLASSES:
+        class_dir = split_dir / class_name
+
+        if not class_dir.exists():
+            continue
+
+        samples.extend(
+            (image_path, class_name)
+            for image_path in sorted(class_dir.iterdir())
+            if is_supported_image(image_path)
+        )
+
+    return samples
+
+
+def run_hard_case_predictions(samples, model_path):
+    device = get_device()
+    model = get_model(str(model_path), str(device))
+    rows = []
+
+    for image_path, true_label in samples:
+        image = Image.open(image_path).convert("RGB")
+        predicted_index, confidence, probabilities = predict_image(
+            model,
+            image,
+            device,
+        )
+        predicted_label = CLASS_NAMES[predicted_index]
+
+        rows.append({
+            "image_path": relative_path(image_path),
+            "true_label": true_label,
+            "predicted_label": predicted_label,
+            "confidence": confidence,
+            "chihuahua_probability": probabilities[0].item(),
+            "muffin_probability": probabilities[1].item(),
+            "correct": predicted_label == true_label,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def show_hard_case_summary(results_df):
+    total_images = len(results_df)
+    correct_images = int(results_df["correct"].sum())
+    accuracy = correct_images / total_images if total_images else 0.0
+    errors_df = results_df[results_df["correct"] == False]
+
+    col_total, col_correct, col_errors, col_accuracy = st.columns(4)
+    col_total.metric("Imagens", total_images)
+    col_correct.metric("Acertos", correct_images)
+    col_errors.metric("Erros", len(errors_df))
+    col_accuracy.metric("Acurácia", f"{accuracy:.2%}")
+
+    if not errors_df.empty:
+        errors_by_class = (
+            errors_df.groupby("true_label")
+            .size()
+            .reset_index(name="errors")
+        )
+        st.subheader("Erros por classe")
+        st.dataframe(errors_by_class, use_container_width=True)
+
+    confusion_df = pd.crosstab(
+        results_df["true_label"],
+        results_df["predicted_label"],
+        rownames=["Classe real"],
+        colnames=["Predição"],
+        dropna=False,
+    ).reindex(index=CLASSES, columns=CLASSES, fill_value=0)
+
+    st.subheader("Matriz de confusão")
+    st.dataframe(confusion_df, use_container_width=True)
+
+
+def show_hard_case_cards(results_df):
+    st.subheader("Resultados por imagem")
+
+    for row_index, row in enumerate(results_df.to_dict("records")):
+        image_path = PROJECT_ROOT / row["image_path"]
+        status = "correto" if row["correct"] else "erro"
+        border_color = "#1f8f4d" if row["correct"] else "#b3261e"
+
+        with st.container(border=True):
+            columns = st.columns([1, 2])
+
+            with columns[0]:
+                st.image(str(image_path), use_container_width=True)
+
+            with columns[1]:
+                st.markdown(
+                    f"<strong style='color:{border_color}'>{status}</strong>",
+                    unsafe_allow_html=True,
+                )
+                st.write(f"Arquivo: `{row['image_path']}`")
+                st.write(f"Classe real: **{row['true_label']}**")
+                st.write(f"Predição: **{row['predicted_label']}**")
+                st.write(f"Confiança: **{row['confidence']:.2%}**")
+                st.write(
+                    "Probabilidades: "
+                    f"chihuahua {row['chihuahua_probability']:.2%}, "
+                    f"muffin {row['muffin_probability']:.2%}"
+                )
+
+        if row_index >= 99:
+            st.info("Exibindo as primeiras 100 imagens para manter a interface leve.")
+            break
+
+
+def show_inference_history():
+    history = st.session_state.get("inference_history", [])
+
+    st.subheader("Histórico de inferências")
+
+    if not history:
+        st.info("Nenhuma inferência foi executada nesta sessão.")
+        return
+
+    history_df = pd.DataFrame(history).drop(columns=["history_key"])
+    st.dataframe(history_df, use_container_width=True)
+
+    if st.button("Limpar histórico de inferências"):
+        st.session_state.inference_history = []
+        st.rerun()
 
 
 def show_home_page():
@@ -295,6 +538,14 @@ def show_inference_page():
         index=get_default_model_index(model_files),
         format_func=lambda path: path.name,
     )
+    true_label = st.selectbox(
+        "Classe real, se conhecida",
+        ["-", *CLASS_NAMES],
+        help=(
+            "Use este campo para o app indicar acerto ou erro. "
+            "Se a classe real não for conhecida, mantenha '-'."
+        ),
+    )
 
     upload_tab, link_tab = st.tabs(["Upload", "Link"])
 
@@ -307,7 +558,12 @@ def show_inference_page():
         if uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
             st.image(image, caption="Imagem enviada", use_container_width=True)
-            show_prediction(image, selected_model)
+            show_prediction(
+                image,
+                selected_model,
+                source=f"upload:{uploaded_file.name}",
+                true_label=true_label,
+            )
 
     with link_tab:
         image_url = st.text_input("Cole o link da imagem")
@@ -316,12 +572,20 @@ def show_inference_page():
             try:
                 image = load_image_from_url(image_url)
                 st.image(image, caption="Imagem do link", use_container_width=True)
-                show_prediction(image, selected_model)
+                show_prediction(
+                    image,
+                    selected_model,
+                    source=f"link:{image_url}",
+                    true_label=true_label,
+                )
             except (URLError, TimeoutError, UnidentifiedImageError, OSError):
                 st.error(
                     "Não foi possível carregar a imagem pelo link. "
                     "Verifique se a URL aponta diretamente para uma imagem."
                 )
+
+
+    show_inference_history()
 
 
 def show_dataset_page():
@@ -485,6 +749,84 @@ def show_model_history_page():
         st.code("python src\\train.py", language="powershell")
 
 
+def show_hard_cases_page():
+    st.title("Casos Ambíguos")
+    st.write(
+        "Execute inferência em lote nas imagens separadas em "
+        "`data/hard_cases/` sem misturá-las automaticamente ao dataset principal."
+    )
+
+    model_files = list_model_files()
+
+    if not model_files:
+        st.warning(
+            "Nenhum modelo treinado foi encontrado. Execute `python "
+            "src\\train.py` para gerar um checkpoint em `models/`."
+        )
+        return
+
+    selected_model = st.selectbox(
+        "Modelo",
+        model_files,
+        index=get_default_model_index(model_files),
+        format_func=lambda path: path.name,
+    )
+    selected_split = st.selectbox(
+        "Split de hard cases",
+        ["test", "val", "train"],
+        help=(
+            "`test` deve ser usado para diagnóstico final. "
+            "`train` e `val` ajudam a inspecionar exemplos usados no ajuste."
+        ),
+    )
+    samples = collect_hard_case_images(selected_split)
+
+    st.write(
+        f"Imagens encontradas em `data/hard_cases/{selected_split}`: "
+        f"**{len(samples)}**"
+    )
+
+    if not samples:
+        st.warning(
+            "Nenhuma imagem foi encontrada para este split. Use a estrutura "
+            "`data/hard_cases/<split>/<classe>/`."
+        )
+        return
+
+    if st.button("Executar inferência em lote"):
+        with st.spinner("Rodando predições nos hard cases..."):
+            st.session_state.hard_cases_results = run_hard_case_predictions(
+                samples,
+                selected_model,
+            )
+            st.session_state.hard_cases_model = selected_model.name
+            st.session_state.hard_cases_split = selected_split
+
+    results_df = st.session_state.get("hard_cases_results")
+
+    if results_df is None:
+        st.info("Clique no botão para executar a inferência em lote.")
+        return
+
+    st.caption(
+        "Resultados atuais: "
+        f"{st.session_state.get('hard_cases_model')} | "
+        f"split {st.session_state.get('hard_cases_split')}"
+    )
+    show_hard_case_summary(results_df)
+
+    show_only_errors = st.checkbox("Mostrar apenas erros", value=False)
+    display_df = results_df
+
+    if show_only_errors:
+        display_df = results_df[results_df["correct"] == False]
+
+    st.subheader("Tabela de resultados")
+    st.dataframe(display_df, use_container_width=True)
+
+    show_hard_case_cards(display_df)
+
+
 def main():
     st.set_page_config(
         page_title="Chihuahua or Muffin",
@@ -505,6 +847,8 @@ def main():
         show_evaluation_history_page()
     elif page == "Histórico de Modelos":
         show_model_history_page()
+    elif page == "Casos Ambíguos":
+        show_hard_cases_page()
 
 
 if __name__ == "__main__":
