@@ -1,8 +1,0 @@
-              precision    recall  f1-score   support
-
-   chihuahua       1.00      0.99      0.99       481
-      muffin       0.99      1.00      0.99       409
-
-    accuracy                           0.99       890
-   macro avg       0.99      0.99      0.99       890
-weighted avg       0.99      0.99      0.99       890
