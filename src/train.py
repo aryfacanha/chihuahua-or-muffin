@@ -10,6 +10,7 @@ from torch import nn, optim
 from config import (
     DEFAULT_ARCHITECTURE,
     EPOCHS,
+    HARD_CASES_DATA_DIR,
     LEARNING_RATE,
     MODEL_HISTORY_PATH,
     MODEL_PATH,
@@ -38,6 +39,26 @@ def parse_args():
         help="Observações opcionais para registrar no histórico de modelos.",
     )
 
+    parser.add_argument(
+        "--include-hard-cases",
+        action="store_true",
+        help=(
+            "Inclui imagens de data/hard_cases/train e data/hard_cases/val "
+            "no treino e na validacao."
+        ),
+    )
+    parser.add_argument(
+        "--unfreeze-last-blocks",
+        nargs="?",
+        const=3,
+        default=0,
+        type=int,
+        help=(
+            "Descongela os ultimos blocos da MobileNetV2 para fine-tuning "
+            "parcial. Sem valor, usa 3 blocos."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -58,28 +79,42 @@ def append_model_history(
     epochs,
     best_val_accuracy,
     train_dataset_path,
+    hard_cases_used,
+    hard_cases_train_path,
+    hard_cases_val_path,
+    unfreeze_last_blocks,
     observations,
 ):
-    history_exists = MODEL_HISTORY_PATH.exists()
     MODEL_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     relative_model_path = model_path.relative_to(PROJECT_ROOT)
     relative_train_dataset_path = train_dataset_path.relative_to(PROJECT_ROOT)
+    fieldnames = [
+        "model_path",
+        "architecture",
+        "created_at",
+        "epochs",
+        "best_val_accuracy",
+        "train_dataset_path",
+        "hard_cases_used",
+        "hard_cases_train_path",
+        "hard_cases_val_path",
+        "unfreeze_last_blocks",
+        "observations",
+    ]
+    existing_rows = []
 
-    with MODEL_HISTORY_PATH.open("a", newline="", encoding="utf-8") as file:
-        fieldnames = [
-            "model_path",
-            "architecture",
-            "created_at",
-            "epochs",
-            "best_val_accuracy",
-            "train_dataset_path",
-            "observations",
-        ]
+    if MODEL_HISTORY_PATH.exists():
+        with MODEL_HISTORY_PATH.open("r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            existing_rows = [
+                {field: row.get(field, "") for field in fieldnames}
+                for row in reader
+            ]
+
+    with MODEL_HISTORY_PATH.open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
-
-        if not history_exists:
-            writer.writeheader()
-
+        writer.writeheader()
+        writer.writerows(existing_rows)
         writer.writerow({
             "model_path": relative_model_path.as_posix(),
             "architecture": architecture,
@@ -87,6 +122,10 @@ def append_model_history(
             "epochs": epochs,
             "best_val_accuracy": f"{best_val_accuracy:.4f}",
             "train_dataset_path": relative_train_dataset_path.as_posix(),
+            "hard_cases_used": hard_cases_used,
+            "hard_cases_train_path": hard_cases_train_path,
+            "hard_cases_val_path": hard_cases_val_path,
+            "unfreeze_last_blocks": unfreeze_last_blocks,
             "observations": observations,
         })
 
@@ -150,8 +189,13 @@ def main():
     device = get_device()
     print(f"Device usado: {describe_device(device)}")
 
-    transform = create_transform()
-    train_dataset, val_dataset, test_dataset = create_datasets(transform)
+    train_transform = create_transform(augment=True)
+    eval_transform = create_transform(augment=False)
+    train_dataset, val_dataset, test_dataset = create_datasets(
+        train_transform=train_transform,
+        eval_transform=eval_transform,
+        include_hard_cases=args.include_hard_cases,
+    )
     train_loader, val_loader, _test_loader = create_dataloaders(
         train_dataset,
         val_dataset,
@@ -159,7 +203,10 @@ def main():
     )
 
     architecture = args.architecture
-    model = create_model(architecture=architecture)
+    model = create_model(
+        architecture=architecture,
+        unfreeze_last_blocks=args.unfreeze_last_blocks,
+    )
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -212,7 +259,15 @@ def main():
     )
     torch.save(best_state_dict, checkpoint_path)
     shutil.copy2(checkpoint_path, MODEL_PATH)
-    observations = args.notes or "Checkpoint copiado para models/best_model.pth"
+    hard_cases_note = (
+        "Hard cases de treino/validacao incluidos"
+        if args.include_hard_cases
+        else "Hard cases nao incluidos"
+    )
+    observations = args.notes or (
+        "Checkpoint copiado para models/best_model.pth. "
+        f"{hard_cases_note}."
+    )
     append_model_history(
         checkpoint_path,
         architecture,
@@ -220,6 +275,10 @@ def main():
         EPOCHS,
         best_val_accuracy,
         PROCESSED_DATA_DIR / "train",
+        args.include_hard_cases,
+        (HARD_CASES_DATA_DIR / "train").relative_to(PROJECT_ROOT).as_posix(),
+        (HARD_CASES_DATA_DIR / "val").relative_to(PROJECT_ROOT).as_posix(),
+        args.unfreeze_last_blocks,
         observations,
     )
 

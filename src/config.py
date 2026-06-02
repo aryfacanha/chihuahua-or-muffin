@@ -5,6 +5,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw" / "kaggle"
 PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
+HARD_CASES_DATA_DIR = PROJECT_ROOT / "data" / "hard_cases"
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 KAGGLE_DATASET_SLUG = "samuelcortinhas/muffin-vs-chihuahua-image-classification"

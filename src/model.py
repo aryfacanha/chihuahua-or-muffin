@@ -14,6 +14,7 @@ def create_model(
     freeze_features=True,
     pretrained=True,
     architecture=DEFAULT_ARCHITECTURE,
+    unfreeze_last_blocks=0,
 ):
     if architecture != DEFAULT_ARCHITECTURE:
         supported = ", ".join(sorted(SUPPORTED_ARCHITECTURES))
@@ -28,6 +29,11 @@ def create_model(
     if freeze_features:
         for parameter in model.features.parameters():
             parameter.requires_grad = False
+
+        if unfreeze_last_blocks > 0:
+            for block in model.features[-unfreeze_last_blocks:]:
+                for parameter in block.parameters():
+                    parameter.requires_grad = True
 
     in_features = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(in_features, num_classes)
