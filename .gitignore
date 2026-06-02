@@ -14,6 +14,7 @@ models/model_history.csv
 # Ignora imagens/dados, mas mantem a estrutura com .gitkeep
 data/raw/**/*
 data/processed/**/*
+data/hard_cases/**/*
 
 reports/*
 
@@ -21,4 +22,6 @@ reports/*
 !data/raw/**/.gitkeep
 !data/processed/**/
 !data/processed/**/.gitkeep
+!data/hard_cases/**/
+!data/hard_cases/**/.gitkeep
 !reports/.gitkeep
