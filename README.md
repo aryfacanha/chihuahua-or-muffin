@@ -93,6 +93,21 @@ python src\prepare_dataset.py --output-dir data\processed
 python src\prepare_dataset.py --train-ratio 0.7 --val-ratio 0.15 --test-ratio 0.15
 ```
 
+Para usar um dataset próprio, o diretório informado em `--raw-dir` precisa conter, em algum nível da árvore, pastas com os nomes exatos das classes:
+
+```text
+path/to/raw_dataset/
+├── alguma_pasta/
+│   ├── chihuahua/
+│   │   ├── imagem_1.jpg
+│   │   └── imagem_2.jpg
+│   └── muffin/
+│       ├── imagem_3.jpg
+│       └── imagem_4.jpg
+```
+
+As pastas `chihuahua` e `muffin` podem estar diretamente na raiz do dataset ou dentro de subpastas, como `train/chihuahua`, `test/chihuahua`, `train/muffin` e `test/muffin`. O script procura essas pastas recursivamente, junta as imagens por classe e cria uma nova divisão em `train`, `val` e `test` dentro de `data/processed/`.
+
 O script valida a existência do dataset bruto, as pastas das classes, os arquivos de imagem suportados e se as proporções somam `1.0`.
 
 ## Status
@@ -123,11 +138,10 @@ A avaliação salva em `reports/classification_report.txt` indica aproximadament
 
 1. Crie e ative um ambiente virtual.
 2. Instale as dependências com `pip install -r requirements.txt`.
-3. Baixe o dataset "Muffin vs Chihuahua" do Kaggle.
-4. Organize o dataset bruto em `data/raw/kaggle/`.
-5. Execute `python src\prepare_dataset.py` ou informe outro dataset com `--raw-dir`.
-6. Execute `python src\train.py` para gerar `models/best_model.pth`.
-7. Execute `python src\evaluate.py` para gerar os relatórios.
+3. Execute `python src\prepare_dataset.py`.
+4. Se `data/raw/kaggle/` ainda não tiver o dataset, o script baixa automaticamente o dataset "Muffin vs Chihuahua" com `kagglehub` e copia os arquivos brutos para `data/raw/kaggle/`.
+5. Execute `python src\train.py` para gerar `models/best_model.pth`.
+6. Execute `python src\evaluate.py` para gerar os relatórios.
 
 Para usar GPU com CUDA, instale a versão de PyTorch compatível com a máquina seguindo a documentação oficial do PyTorch.
 

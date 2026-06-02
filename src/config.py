@@ -7,6 +7,7 @@ RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw" / "kaggle"
 PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
+KAGGLE_DATASET_SLUG = "samuelcortinhas/muffin-vs-chihuahua-image-classification"
 
 MODEL_PATH = MODELS_DIR / "best_model.pth"
 MODEL_HISTORY_PATH = MODELS_DIR / "model_history.csv"

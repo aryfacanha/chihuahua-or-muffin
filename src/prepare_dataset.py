@@ -6,6 +6,7 @@ from pathlib import Path
 from config import (
     CLASSES,
     IMAGE_EXTENSIONS,
+    KAGGLE_DATASET_SLUG,
     PROCESSED_DATA_DIR,
     RAW_DATA_DIR,
     SEED,
@@ -24,7 +25,7 @@ def parse_args():
     parser.add_argument(
         "--raw-dir",
         type=Path,
-        default=RAW_DATA_DIR,
+        default=None,
         help=(
             "Caminho do dataset bruto. "
             f"Padrão: {RAW_DATA_DIR}"
@@ -63,6 +64,60 @@ def parse_args():
 
 def is_image(path):
     return path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+
+
+def has_class_dirs(raw_dir):
+    if not raw_dir.exists():
+        return False
+
+    return all(find_class_dirs(raw_dir, class_name) for class_name in CLASSES)
+
+
+def download_default_dataset():
+    try:
+        import kagglehub
+    except ImportError as error:
+        raise ImportError(
+            "Dependência kagglehub não encontrada. "
+            "Instale as dependências com `pip install -r requirements.txt`."
+        ) from error
+
+    print("Dataset bruto padrão não encontrado.")
+    print(f"Baixando dataset do Kaggle: {KAGGLE_DATASET_SLUG}")
+    dataset_path = Path(kagglehub.dataset_download(KAGGLE_DATASET_SLUG))
+    print(f"Dataset baixado em: {dataset_path}")
+
+    return dataset_path
+
+
+def copy_downloaded_dataset_to_raw_dir(downloaded_dir):
+    RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Copiando dataset bruto para: {RAW_DATA_DIR}")
+
+    for source_path in downloaded_dir.rglob("*"):
+        relative_path = source_path.relative_to(downloaded_dir)
+        target_path = RAW_DATA_DIR / relative_path
+
+        if source_path.is_dir():
+            target_path.mkdir(parents=True, exist_ok=True)
+            continue
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path)
+
+    return RAW_DATA_DIR
+
+
+def resolve_raw_dir(raw_dir_argument):
+    if raw_dir_argument is not None:
+        return raw_dir_argument.resolve()
+
+    if has_class_dirs(RAW_DATA_DIR):
+        return RAW_DATA_DIR.resolve()
+
+    downloaded_dir = download_default_dataset()
+
+    return copy_downloaded_dataset_to_raw_dir(downloaded_dir).resolve()
 
 
 def validate_ratios(train_ratio, val_ratio, test_ratio):
@@ -179,7 +234,7 @@ def print_summary(raw_dir, output_dir, ratios, counts):
 
 def main():
     args = parse_args()
-    raw_dir = args.raw_dir.resolve()
+    raw_dir = resolve_raw_dir(args.raw_dir)
     output_dir = args.output_dir.resolve()
     ratios = (args.train_ratio, args.val_ratio, args.test_ratio)
 

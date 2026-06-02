@@ -1,4 +1,4 @@
-kaggle
+kagglehub
 torch
 torchvision
 pillow

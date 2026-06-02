@@ -15,6 +15,8 @@ A solução cobre o fluxo completo: preparação do dataset, carregamento com Py
 
 O arquivo `src/prepare_dataset.py` lê as imagens brutas em `data/raw/kaggle/`.
 
+Ao clonar o repositório, essa pasta existe apenas como estrutura vazia mantida por `.gitkeep`. Se o dataset padrão ainda não estiver disponível nesse caminho, o script baixa o dataset "Muffin vs Chihuahua" automaticamente com `kagglehub`, copia os arquivos brutos para `data/raw/kaggle/` e usa essa pasta como origem.
+
 Esse caminho é o padrão do projeto, mas pode ser alterado pela CLI:
 
 ```powershell
