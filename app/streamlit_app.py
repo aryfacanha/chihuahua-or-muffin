@@ -1,9 +1,11 @@
+import json
 import sys
 from io import BytesIO
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+import pandas as pd
 import streamlit as st
 import torch
 from PIL import Image, UnidentifiedImageError
@@ -15,9 +17,77 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
-from config import MODEL_PATH, MODELS_DIR
+from config import (
+    IMAGE_EXTENSIONS,
+    MODEL_HISTORY_PATH,
+    MODEL_PATH,
+    MODELS_DIR,
+    PROCESSED_DATA_DIR,
+    REPORTS_DIR,
+    SPLITS,
+)
 from device import get_device
 from predict import CLASS_NAMES, load_model, predict_image
+
+
+PAGES = [
+    "Início",
+    "Inferência",
+    "Dataset",
+    "Dashboard de Avaliação",
+    "Histórico de Avaliações",
+    "Histórico de Modelos",
+]
+
+
+def apply_sidebar_styles():
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stSidebar"] div.stButton > button {
+            background: transparent;
+            border: 0;
+            border-radius: 6px;
+            color: inherit;
+            font-size: 1.08rem;
+            font-weight: 600;
+            justify-content: flex-start;
+            margin: 0.18rem 0;
+            padding: 0.7rem 0.85rem;
+            text-align: left;
+            width: 100%;
+        }
+
+        div[data-testid="stSidebar"] div.stButton > button:hover {
+            background: rgba(255, 75, 75, 0.12);
+            color: rgb(255, 75, 75);
+        }
+
+        div[data-testid="stSidebar"] div.stButton > button:focus {
+            box-shadow: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_navigation():
+    if "selected_page" not in st.session_state:
+        st.session_state.selected_page = PAGES[0]
+
+    with st.sidebar:
+        for page in PAGES:
+            label = page
+
+            if page == st.session_state.selected_page:
+                label = f"▸ {page}"
+
+            if st.button(label, key=f"nav_{page}"):
+                st.session_state.selected_page = page
+                st.rerun()
+
+    return st.session_state.selected_page
 
 
 @st.cache_resource
@@ -45,6 +115,97 @@ def get_default_model_index(model_files):
         return model_files.index(MODEL_PATH)
 
     return 0
+
+
+def list_evaluation_dirs():
+    evaluations_dir = REPORTS_DIR / "evaluations"
+
+    if not evaluations_dir.exists():
+        return []
+
+    return sorted(
+        path
+        for path in evaluations_dir.iterdir()
+        if path.is_dir() and path.name != "by_model"
+    )
+
+
+def read_csv_if_exists(path):
+    if not path.exists():
+        return None
+
+    return pd.read_csv(path)
+
+
+def read_text_if_exists(path):
+    if not path.exists():
+        return None
+
+    return path.read_text(encoding="utf-8")
+
+
+def read_metrics_if_exists(evaluation_dir):
+    metrics_path = evaluation_dir / "metrics.json"
+
+    if not metrics_path.exists():
+        return None
+
+    return json.loads(metrics_path.read_text(encoding="utf-8"))
+
+
+def count_images(folder):
+    if not folder.exists():
+        return 0
+
+    return sum(
+        1
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+    )
+
+
+def get_dataset_status():
+    rows = []
+
+    for split in SPLITS:
+        split_dir = PROCESSED_DATA_DIR / split
+
+        if not split_dir.exists():
+            rows.append({
+                "split": split,
+                "classe": "-",
+                "imagens": 0,
+                "status": "não encontrado",
+            })
+            continue
+
+        class_dirs = sorted(path for path in split_dir.iterdir() if path.is_dir())
+
+        if not class_dirs:
+            rows.append({
+                "split": split,
+                "classe": "-",
+                "imagens": 0,
+                "status": "sem classes",
+            })
+            continue
+
+        for class_dir in class_dirs:
+            rows.append({
+                "split": split,
+                "classe": class_dir.name,
+                "imagens": count_images(class_dir),
+                "status": "ok",
+            })
+
+    return pd.DataFrame(rows)
+
+
+def has_processed_dataset(dataset_status):
+    expected_splits = set(SPLITS)
+    detected_splits = set(dataset_status.loc[dataset_status["imagens"] > 0, "split"])
+
+    return expected_splits.issubset(detected_splits)
 
 
 def load_image_from_url(image_url):
@@ -77,21 +238,52 @@ def show_prediction(image, model_path):
     st.write(f"Muffin: **{probabilities[1].item():.2%}**")
 
 
-def main():
-    st.set_page_config(
-        page_title="Chihuahua or Muffin",
-    )
-
+def show_home_page():
     st.title("Chihuahua or Muffin")
     st.write(
-        "Envie uma imagem para o modelo classificar se ela parece um "
-        "chihuahua ou um muffin."
+        "Projeto acadêmico de Visão Computacional para classificar imagens "
+        "entre duas classes: chihuahua e muffin."
     )
+
+    st.subheader("Pipeline")
+    st.write(
+        "O fluxo do projeto passa por preparação do dataset, treinamento do "
+        "modelo, avaliação e inferência em imagens novas."
+    )
+
+    dataset_status = get_dataset_status()
+    model_files = list_model_files()
+    evaluation_dirs = list_evaluation_dirs()
+
+    st.subheader("Status atual")
+    col_dataset, col_models, col_evaluations = st.columns(3)
+    col_dataset.metric(
+        "Dataset processado",
+        "detectado" if has_processed_dataset(dataset_status) else "pendente",
+    )
+    col_models.metric("Modelos disponíveis", len(model_files))
+    col_evaluations.metric("Avaliações salvas", len(evaluation_dirs))
+
+    total_images = int(dataset_status["imagens"].sum())
+    st.metric("Imagens processadas", total_images)
+
+    if model_files:
+        st.info("Há modelos disponíveis. Use a página Inferência para testar imagens.")
+    else:
+        st.warning(
+            "Nenhum modelo foi encontrado. Execute `python src\\train.py` "
+            "para treinar um checkpoint."
+        )
+
+
+def show_inference_page():
+    st.title("Inferência")
+    st.write("Selecione um checkpoint e envie uma imagem para classificação.")
 
     model_files = list_model_files()
 
     if not model_files:
-        st.error(
+        st.warning(
             "Nenhum modelo treinado foi encontrado. Execute `python "
             "src\\train.py` para gerar um checkpoint em `models/`."
         )
@@ -130,6 +322,189 @@ def main():
                     "Não foi possível carregar a imagem pelo link. "
                     "Verifique se a URL aponta diretamente para uma imagem."
                 )
+
+
+def show_dataset_page():
+    st.title("Dataset")
+    st.write("Status local do dataset processado usado pelo PyTorch.")
+
+    dataset_status = get_dataset_status()
+
+    if has_processed_dataset(dataset_status):
+        st.success("Dataset processado detectado.")
+    else:
+        st.warning("Dataset processado incompleto ou não encontrado.")
+
+    st.dataframe(dataset_status, use_container_width=True)
+
+    st.subheader("Comandos úteis")
+    st.code("python src\\prepare_dataset.py", language="powershell")
+    st.code(
+        "python src\\prepare_dataset.py --raw-dir path\\to\\raw_dataset",
+        language="powershell",
+    )
+
+
+def get_evaluation_options():
+    history_path = REPORTS_DIR / "evaluation_history.csv"
+    history_df = read_csv_if_exists(history_path)
+
+    if history_df is not None and not history_df.empty:
+        return history_df
+
+    evaluation_dirs = list_evaluation_dirs()
+
+    if not evaluation_dirs:
+        return pd.DataFrame()
+
+    return pd.DataFrame({
+        "evaluation_dir": [path.relative_to(PROJECT_ROOT).as_posix() for path in evaluation_dirs],
+        "model_name": [path.name for path in evaluation_dirs],
+    })
+
+
+def show_metrics(metrics):
+    col_acc, col_precision, col_recall, col_f1 = st.columns(4)
+    col_acc.metric("Accuracy", f"{metrics['accuracy']:.4f}")
+    col_precision.metric("Precision", f"{metrics['precision']:.4f}")
+    col_recall.metric("Recall", f"{metrics['recall']:.4f}")
+    col_f1.metric("F1-score", f"{metrics['f1_score']:.4f}")
+
+
+def show_confusion_matrix(evaluation_dir, metrics):
+    image_path = evaluation_dir / "confusion_matrix.png"
+
+    if image_path.exists():
+        st.image(str(image_path), caption="Matriz de confusão")
+        return
+
+    if metrics and "confusion_matrix" in metrics:
+        matrix = pd.DataFrame(
+            metrics["confusion_matrix"],
+            index=metrics.get("class_names"),
+            columns=metrics.get("class_names"),
+        )
+        st.dataframe(matrix, use_container_width=True)
+        return
+
+    st.warning("Matriz de confusão não encontrada para esta avaliação.")
+
+
+def show_evaluation_details(evaluation_dir):
+    metrics = read_metrics_if_exists(evaluation_dir)
+
+    if metrics:
+        show_metrics(metrics)
+    else:
+        st.warning("Arquivo metrics.json não encontrado para esta avaliação.")
+
+    st.subheader("Matriz de confusão")
+    show_confusion_matrix(evaluation_dir, metrics)
+
+    report = read_text_if_exists(evaluation_dir / "classification_report.txt")
+
+    if report:
+        with st.expander("Relatório de classificação", expanded=True):
+            st.text(report)
+    else:
+        st.warning("Relatório de classificação não encontrado.")
+
+    predictions = read_csv_if_exists(evaluation_dir / "predictions.csv")
+
+    if predictions is not None:
+        with st.expander("Predições", expanded=False):
+            st.dataframe(predictions, use_container_width=True)
+
+
+def show_evaluation_dashboard_page():
+    st.title("Dashboard de Avaliação")
+
+    evaluations_df = get_evaluation_options()
+
+    if evaluations_df.empty:
+        st.warning(
+            "Nenhuma avaliação foi encontrada. Gere uma avaliação com "
+            "`python src\\evaluate.py --model-path models\\best_model.pth`."
+        )
+        return
+
+    evaluation_labels = evaluations_df["evaluation_dir"].tolist()
+    selected_label = st.selectbox("Avaliação", evaluation_labels)
+    evaluation_dir = PROJECT_ROOT / selected_label
+
+    show_evaluation_details(evaluation_dir)
+
+
+def show_evaluation_history_page():
+    st.title("Histórico de Avaliações")
+
+    history_path = REPORTS_DIR / "evaluation_history.csv"
+    history_df = read_csv_if_exists(history_path)
+
+    if history_df is None or history_df.empty:
+        st.warning("Histórico de avaliações não encontrado.")
+        st.code("python src\\evaluate.py", language="powershell")
+        return
+
+    st.dataframe(history_df, use_container_width=True)
+    selected_evaluation = st.selectbox(
+        "Ver detalhes da avaliação",
+        history_df["evaluation_dir"].tolist(),
+    )
+
+    if selected_evaluation:
+        with st.expander("Detalhes", expanded=False):
+            show_evaluation_details(PROJECT_ROOT / selected_evaluation)
+
+
+def show_model_history_page():
+    st.title("Histórico de Modelos")
+
+    model_files = list_model_files()
+
+    if model_files:
+        rows = []
+        for model_file in model_files:
+            rows.append({
+                "modelo": model_file.name,
+                "caminho": model_file.relative_to(PROJECT_ROOT).as_posix(),
+                "padrão": model_file == MODEL_PATH,
+            })
+
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    else:
+        st.warning("Nenhum checkpoint `.pth` ou `.pt` foi encontrado em `models/`.")
+
+    history_df = read_csv_if_exists(MODEL_HISTORY_PATH)
+
+    if history_df is not None and not history_df.empty:
+        st.subheader("model_history.csv")
+        st.dataframe(history_df, use_container_width=True)
+    else:
+        st.info("`models/model_history.csv` ainda não existe.")
+        st.code("python src\\train.py", language="powershell")
+
+
+def main():
+    st.set_page_config(
+        page_title="Chihuahua or Muffin",
+    )
+    apply_sidebar_styles()
+
+    page = render_sidebar_navigation()
+
+    if page == "Início":
+        show_home_page()
+    elif page == "Inferência":
+        show_inference_page()
+    elif page == "Dataset":
+        show_dataset_page()
+    elif page == "Dashboard de Avaliação":
+        show_evaluation_dashboard_page()
+    elif page == "Histórico de Avaliações":
+        show_evaluation_history_page()
+    elif page == "Histórico de Modelos":
+        show_model_history_page()
 
 
 if __name__ == "__main__":
